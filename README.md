@@ -23,7 +23,7 @@ Welcome, noble visitor, to the repository of Queen Tora's Royal Kaleidoscope! Th
 There are two main ways to behold this kaleidoscopic wonder:
 
 1.  **View it Live on GitHub Pages (Recommended for most users):**
-    * Simply visit [**Kaleidoscope**](https://jstanoeva.github.io/kaleidoscope/)
+    * Simply visit [**Kaleidoscope Live**](https://jstanoeva.github.io/kaleidoscope/)
 
 2.  **Run it Locally (If you're a fellow code-conjurer):**
     * Clone this repository to your local machine:
