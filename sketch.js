@@ -22,15 +22,15 @@ function resetBackground() {
 
 function setup() {
   // Make the canvas fill the entire window
-  createCanvas(windowWidth, windowHeight).parent('kaleidoscope-canvas');
+  createCanvas(windowWidth, windowHeight).parent("kaleidoscope-canvas");
   angleMode(RADIANS);
   resetBackground();
   angle = TWO_PI / segments;
 
-  const controls = select('#controls');
-  createSpan('Symmetry ').parent(controls);
+  const controls = select("#controls");
+  createSpan("Symmetry ").parent(controls);
   symmetrySlider = createSlider(2, 12, segments, 1).parent(controls);
-  createSpan(' Stroke Weight ').parent(controls);
+  createSpan(" Stroke Weight ").parent(controls);
   strokeSlider = createSlider(1, 12, 10, 0.5).parent(controls);
 
   // Display initial instructions
