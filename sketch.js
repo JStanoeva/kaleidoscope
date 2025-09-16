@@ -9,11 +9,14 @@ let hueValue = 0; // For cycling through colors
 
 let symmetrySlider;
 let strokeSlider;
+let downloadButton;
+let statusLabel;
+let canvasElement;
 
-// To display an initial message
+let isFrozen = false; // Tracks whether new drawing should be paused
 let hasDrawn = false;
 const instructionText =
-  "Move your mouse to draw patterns!\nClick to clear the canvas.\nUse the sliders to change symmetry and stroke weight.";
+  "Move your mouse to draw patterns!\nLeft click the canvas to freeze or resume the current design.\nRight click (or two-finger tap) on the canvas to reset.\nUse the sliders to change symmetry and stroke weight.";
 const backgroundColor = [10, 10, 25]; // Royal dark blue background
 
 function resetBackground() {
@@ -21,32 +24,62 @@ function resetBackground() {
 }
 
 function setup() {
-  // Make the canvas fill the entire window
-  createCanvas(windowWidth, windowHeight).parent("kaleidoscope-canvas");
+  canvasElement = createCanvas(windowWidth, windowHeight).parent(
+    "kaleidoscope-canvas"
+  );
   angleMode(RADIANS);
   resetBackground();
   angle = TWO_PI / segments;
 
+  // Prevent the default context menu so right-click can reset the canvas
+  canvasElement.elt.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+  });
+
   const controls = select("#controls");
-  createSpan("Symmetry ").parent(controls);
-  symmetrySlider = createSlider(2, 12, segments, 1).parent(controls);
-  createSpan(" Stroke Weight ").parent(controls);
-  strokeSlider = createSlider(1, 12, 10, 0.5).parent(controls);
+  controls.addClass("controls-panel");
+
+  const title = createDiv("Royal Kaleidoscope").parent(controls);
+  title.addClass("panel-title");
+
+  const symmetryRow = createDiv().parent(controls);
+  symmetryRow.addClass("control-row");
+  createSpan("Symmetry").parent(symmetryRow).addClass("control-label");
+  symmetrySlider = createSlider(2, 12, segments, 1).parent(symmetryRow);
+
+  const strokeRow = createDiv().parent(controls);
+  strokeRow.addClass("control-row");
+  createSpan("Stroke Weight").parent(strokeRow).addClass("control-label");
+  strokeSlider = createSlider(1, 12, 10, 0.5).parent(strokeRow);
+
+  downloadButton = createButton("Download PNG").parent(controls);
+  downloadButton.addClass("action-button");
+  downloadButton.attribute("disabled", "true");
+  downloadButton.mousePressed(() => {
+    if (isFrozen && hasDrawn) {
+      saveCanvas("kaleidoscope-pattern", "png");
+    }
+  });
+
+  statusLabel = createDiv("").parent(controls);
+  statusLabel.addClass("status-label");
+
+  cursor("crosshair");
 
   // Display initial instructions
   displayInitialMessage();
+  updateStatus();
 }
 
 function displayInitialMessage() {
   push(); // Isolate text drawing settings
-  // Ensure text is drawn without being affected by current transformations from draw() if called later
   resetMatrix();
   resetBackground();
   textAlign(CENTER, CENTER);
+  colorMode(RGB, 255);
   fill(220, 220, 250); // Light lavender text
   noStroke();
   textSize(16);
-  // Use width and height which are now set to windowWidth/Height by createCanvas
   text(instructionText, width / 2, height / 2);
   pop();
 }
@@ -55,6 +88,10 @@ function draw() {
   segments = symmetrySlider.value();
   angle = TWO_PI / segments;
   const maxStroke = strokeSlider.value();
+
+  if (isFrozen) {
+    return;
+  }
 
   translate(width / 2, height / 2); // Center all drawing operations
 
@@ -66,12 +103,13 @@ function draw() {
         resetBackground();
         pop();
         hasDrawn = true;
+        updateStatus();
       }
 
-      let mx = mouseX - width / 2;
-      let my = mouseY - height / 2;
-      let pmx = pmouseX - width / 2;
-      let pmy = pmouseY - height / 2;
+      const mx = mouseX - width / 2;
+      const my = mouseY - height / 2;
+      const pmx = pmouseX - width / 2;
+      const pmy = pmouseY - height / 2;
 
       hueValue = (hueValue + 0.8) % 360;
       let saturation = map(
@@ -83,7 +121,7 @@ function draw() {
       ); // Use min(width,height) for more consistent saturation mapping
       saturation = constrain(saturation, 60, 100);
 
-      let speed = dist(mx, my, pmx, pmy);
+      const speed = dist(mx, my, pmx, pmy);
       let currentStrokeWeight = map(speed, 0, 40, 2, maxStroke);
       currentStrokeWeight = constrain(currentStrokeWeight, 1.5, maxStroke);
 
@@ -105,18 +143,57 @@ function draw() {
   }
 }
 
-function mousePressed() {
-  push();
-  resetMatrix();
-  resetBackground();
-  pop();
+function toggleFreeze() {
+  if (!hasDrawn) {
+    return;
+  }
+  isFrozen = !isFrozen;
+  updateStatus();
+}
 
-  hasDrawn = true; // Drawing will re-commence
+function handleReset() {
+  isFrozen = false;
+  hasDrawn = false;
   hueValue = random(360);
+  displayInitialMessage();
+  updateStatus();
+}
 
-  // If you'd like the instructions to reappear on clear, you'd set hasDrawn = false;
-  // and then call displayInitialMessage();
-  // For now, clicking clears to a blank canvas ready for new art.
+function updateStatus() {
+  if (!statusLabel || !downloadButton) {
+    return;
+  }
+
+  if (isFrozen) {
+    statusLabel.html(
+      "Pattern frozen. Left click to resume, right click to reset, or download the PNG."
+    );
+    downloadButton.removeAttribute("disabled");
+    cursor("not-allowed");
+  } else {
+    if (hasDrawn) {
+      statusLabel.html(
+        "Drawing live. Left click to freeze/resume, right click to reset."
+      );
+    } else {
+      statusLabel.html(
+        "Move your mouse to begin. Left click to freeze/resume, right click to reset."
+      );
+    }
+    downloadButton.attribute("disabled", "true");
+    cursor("crosshair");
+  }
+}
+
+function mousePressed(event) {
+  if (!event || event.target === canvasElement.elt) {
+    if (mouseButton === LEFT) {
+      toggleFreeze();
+    } else if (mouseButton === RIGHT) {
+      handleReset();
+    }
+    return false;
+  }
 }
 
 function windowResized() {
@@ -126,20 +203,9 @@ function windowResized() {
   // If the initial message was shown, or if the canvas is cleared,
   // redraw the background and the message.
   if (!hasDrawn) {
-    // Background needs to cover the new size, and text needs to be re-centered.
-    displayInitialMessage(); // This function now handles background & text correctly
-  } else {
-    // If a drawing was in progress, resizing will change the canvas dimensions.
-    // The existing drawing remains, and new lines will be drawn relative to the new center.
-    // For a cleaner experience on resize when art is present, you could clear it:
-    // (This is the same as mousePressed essentially)
-    // push();
-    // resetMatrix();
-    // background(backgroundColor[0], backgroundColor[1], backgroundColor[2]);
-    // pop();
-    // hueValue = random(360); // Optional: reset color cycle
-    // However, allowing the art to persist and grow into the new space can also be interesting!
-    // For now, it persists. The background is NOT automatically redrawn here if hasDrawn is true,
-    // so the existing pattern remains.
+    displayInitialMessage();
   }
+  // When art is present (frozen or not), allow it to persist through resizes.
 }
+
+
